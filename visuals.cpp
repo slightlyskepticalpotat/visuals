@@ -2,6 +2,8 @@
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <sstream>
+#include <fstream>
 
 // register other functions
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -45,14 +47,87 @@ int main()
     glViewport(0, 0, win_width, win_height);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);  
 
+    // basic vertex shader
+    std::ostringstream sstream;
+    std::ifstream fs("vertexShaderSource.vert");
+    sstream << fs.rdbuf();
+    const std::string str(sstream.str());
+    const char* vertexShaderSource = str.c_str();
+
+    // compile vertex shader
+    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+
+    // basic fragment shader
+    std::ostringstream sstream2;
+    std::ifstream fs2("fragmentShaderSource.frag");
+    sstream2 << fs2.rdbuf();
+    const std::string str2(sstream2.str());
+    const char* fragmentShaderSource = str2.c_str();
+
+    // compile fragment shader
+    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+
+    // link all of our shaders
+    unsigned int shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+
+    // delete shaders after linking them
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);  
+
+    // input vertex data
+    float vertices[] = {
+        -0.5303f, -0.5303f, 0.0000f,
+        0.5303f, -0.5303f, 0.0000f,
+        0.0000f,  0.7500f, 0.0000f
+    };
+
+    // opengl object (vertex buffer object)
+    unsigned int VBO;
+    glGenBuffers(1, &VBO);
+
+    // draw vao object (vertex array object)
+    unsigned int VAO;
+    glGenVertexArrays(1, &VAO);  
+
+    // bind the vao and copy data there
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // bind to buffer and populate
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);  
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // tell opengl how to read vertex data
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);  
+
+    // variable that changes
+    float colour = 0.0f;
+    const float h = (float) 1 / (float) 1024;
+
     // simple render loop with double buffer
     while(!glfwWindowShouldClose(window)) {
         // input
         processInput(window);
 
-        // render
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // state setting func
+        // render background
+        glClearColor(colour * h, colour * h, colour * h, 1.0f); // state setting func
         glClear(GL_COLOR_BUFFER_BIT); // state using func
+        colour += 1;
+        std::cout << colour << std::endl;
+
+        // render the fucking triangle
+        glUseProgram(shaderProgram);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // display
         glfwPollEvents();    
