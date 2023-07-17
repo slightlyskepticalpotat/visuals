@@ -64,6 +64,13 @@ int main(int argc, char *argv[]) // name of audio file
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
+    int success;
+    char infoLog[512];
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+    }
 
     // basic fragment shader
     std::ostringstream sstream2;
@@ -102,6 +109,9 @@ int main(int argc, char *argv[]) // name of audio file
     unsigned int VAO;
     glGenVertexArrays(1, &VAO);  
 
+    // ebo is element buffer object
+    // stores indicies opengl uses to draw
+
     // bind the vao and copy data there
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -120,28 +130,32 @@ int main(int argc, char *argv[]) // name of audio file
     sound_buffer.loadFromFile(argv[1]);
     const sf::Int16* samples = sound_buffer.getSamples();
     std::size_t count = sound_buffer.getSampleCount();
-    printf("%d\n", samples[520000]);
+    int proc_count = count / 1000;
+    int proc_samples[proc_count];
+    for (int i = 0; i < proc_count; i++) {
+        proc_samples[i] = samples[i * 1000];
+    }
+
+    // useful if sound samples are all small
+    // int min_sample = -16, max_sample = 16, current;
 
     // actually process the sound data
-    int min_sample = -16, max_sample = 16, current;
-
-    // this gives one very high and very low sample
     // because there are too many samples, have to remove some
-    //int min_sample = 2147483647, max_sample = -2147483647, current;
-    //for (int i = 0; i < count; i++) {
-    //    current = samples[i];
-    //    if (current < min_sample) {
-    //        min_sample = current;
-    //    }
-    //    if (current > max_sample) {
-    //        max_sample = current;
-    //    }
-    // }
+    int min_sample = 2147483647, max_sample = -2147483647, current;
+    for (int i = 0; i < proc_count; i++) {
+        current = proc_samples[i];
+        if (current < min_sample) {
+            min_sample = current;
+        }
+        if (current > max_sample) {
+            max_sample = current;
+        }
+    }
 
     // scale the sound data
     printf("%d %d\n", min_sample, max_sample);
     long long audio_i = 0;
-    const float h = (float) 1 / (float) max_sample;
+    const float h = (float) 1 / (float) std::max(abs(max_sample), abs(min_sample));
 
     // frame time counter init
     double last = glfwGetTime();
@@ -149,15 +163,20 @@ int main(int argc, char *argv[]) // name of audio file
 
     // simple render loop with double buffer
     while(!glfwWindowShouldClose(window)) {
-        // calculate the current visualisation
-        float cur_colour = (float) abs(samples[audio_i]) * h;
-        // fps counter update
+        // close if we exceeded the time
+        if (audio_i >= proc_count) {
+            glfwSetWindowShouldClose(window, true);
+        }
+
+        // calculate current visualisation and update counter
+        float cur_colour = (float) abs(proc_samples[audio_i]) * h;
         double now = glfwGetTime();
         frames += 1;
-        // update this every second
+
+        // this updates every second
         if (now - last >= 1.0){ 
             printf("%d fps\n", (int) frames);
-            printf("%f val\n", cur_colour);
+            printf("%.2f val\n", cur_colour);
             frames = 0;
             last += 1.0;
         }
@@ -165,7 +184,7 @@ int main(int argc, char *argv[]) // name of audio file
         // input
         processInput(window);
 
-        // render background with audio
+        // render background with audio data
         glClearColor(cur_colour, cur_colour, cur_colour, 1.0f); // state setting func
         glClear(GL_COLOR_BUFFER_BIT); // state using func
         audio_i += 1;
@@ -173,6 +192,7 @@ int main(int argc, char *argv[]) // name of audio file
         // render the fucking triangle
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // draw wireframe triangle
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // display
