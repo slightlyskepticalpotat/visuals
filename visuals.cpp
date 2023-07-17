@@ -113,8 +113,22 @@ int main()
     float colour = 0.0f;
     const float h = (float) 1 / (float) 1024;
 
+    // frame time counter init
+    double last = glfwGetTime();
+    int frames = 0;
+
     // simple render loop with double buffer
     while(!glfwWindowShouldClose(window)) {
+        // fps counter update
+        double now = glfwGetTime();
+        frames += 1;
+        // update this every second
+        if (now - last >= 1.0){ 
+            printf("%d fps\n", (int) frames);
+            frames = 0;
+            last += 1.0;
+        }
+
         // input
         processInput(window);
 
@@ -122,7 +136,6 @@ int main()
         glClearColor(colour * h, colour * h, colour * h, 1.0f); // state setting func
         glClear(GL_COLOR_BUFFER_BIT); // state using func
         colour += 1;
-        std::cout << colour << std::endl;
 
         // render the fucking triangle
         glUseProgram(shaderProgram);
