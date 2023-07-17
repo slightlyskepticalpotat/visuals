@@ -1,5 +1,6 @@
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
+#include <SFML/Audio.hpp>
 
 #include <iostream>
 #include <sstream>
@@ -9,8 +10,13 @@
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 
-int main()
+int main(int argc, char *argv[]) // name of audio file
 {
+    if (argc != 2) {
+        printf("No audio file provided");
+        exit(0);
+    }
+
     // init the glsl context
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -109,9 +115,33 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);  
 
-    // variable that changes
-    float colour = 0.0f;
-    const float h = (float) 1 / (float) 1024;
+    // get the sound data with sfml
+    sf::SoundBuffer sound_buffer;
+    sound_buffer.loadFromFile(argv[1]);
+    const sf::Int16* samples = sound_buffer.getSamples();
+    std::size_t count = sound_buffer.getSampleCount();
+    printf("%d\n", samples[520000]);
+
+    // actually process the sound data
+    int min_sample = -16, max_sample = 16, current;
+
+    // this gives one very high and very low sample
+    // because there are too many samples, have to remove some
+    //int min_sample = 2147483647, max_sample = -2147483647, current;
+    //for (int i = 0; i < count; i++) {
+    //    current = samples[i];
+    //    if (current < min_sample) {
+    //        min_sample = current;
+    //    }
+    //    if (current > max_sample) {
+    //        max_sample = current;
+    //    }
+    // }
+
+    // scale the sound data
+    printf("%d %d\n", min_sample, max_sample);
+    long long audio_i = 0;
+    const float h = (float) 1 / (float) max_sample;
 
     // frame time counter init
     double last = glfwGetTime();
@@ -119,12 +149,15 @@ int main()
 
     // simple render loop with double buffer
     while(!glfwWindowShouldClose(window)) {
+        // calculate the current visualisation
+        float cur_colour = (float) abs(samples[audio_i]) * h;
         // fps counter update
         double now = glfwGetTime();
         frames += 1;
         // update this every second
         if (now - last >= 1.0){ 
             printf("%d fps\n", (int) frames);
+            printf("%f val\n", cur_colour);
             frames = 0;
             last += 1.0;
         }
@@ -132,11 +165,11 @@ int main()
         // input
         processInput(window);
 
-        // render background
-        glClearColor(colour * h, colour * h, colour * h, 1.0f); // state setting func
+        // render background with audio
+        glClearColor(cur_colour, cur_colour, cur_colour, 1.0f); // state setting func
         glClear(GL_COLOR_BUFFER_BIT); // state using func
-        colour += 1;
-
+        audio_i += 1;
+        
         // render the fucking triangle
         glUseProgram(shaderProgram);
         glBindVertexArray(VAO);
@@ -165,4 +198,4 @@ void processInput(GLFWwindow *window)
         glfwSetWindowShouldClose(window, true);
 }
 
-// g++ visuals.cpp glad.c -lglfw3 -lGL -lX11 -lpthread -lXrandr -lXi -ldl; ./a.out
+// g++ visuals.cpp glad.c -lglfw3 -lGL -lX11 -lpthread -lXrandr -lXi -ldl -lsfml-audio -lsfml-window -lsfml-system; ./a.out c418_sweden.flac
